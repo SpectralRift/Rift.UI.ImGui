@@ -1,0 +1,3 @@
+#pragma once
+
+#define IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS
