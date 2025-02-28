@@ -36,4 +36,8 @@ namespace engine::ui {
 
     void ImGui_Shutdown() {
     }
+
+    ImGuiContext* ImGui_GetGlobalContext() {
+        return g_ImGuiContext;
+    }
 }

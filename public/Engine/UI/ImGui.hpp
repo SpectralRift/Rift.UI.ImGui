@@ -11,4 +11,6 @@ namespace engine::ui {
 
     extern void ImGui_BeginFrame();
     extern void ImGui_EndFrame();
+
+    extern ImGuiContext* ImGui_GetGlobalContext();
 }
