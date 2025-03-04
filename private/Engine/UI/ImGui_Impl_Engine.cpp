@@ -90,7 +90,7 @@ namespace engine::ui {
         io.BackendRendererUserData = IM_NEW(ImGui_ImplEngine_Data)();
         io.BackendRendererName = "imgui_impl_engine_rift";
         io.BackendPlatformName = "imgui_impl_engine_rift";
-        io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;
+        io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
         ImFontConfig font_cfg;
         font_cfg.SizePixels = 20.0f;
@@ -174,7 +174,7 @@ namespace engine::ui {
 //        ImGui_ImplOpenGL2_DestroyDeviceObjects();
         io.BackendRendererName = nullptr;
         io.BackendRendererUserData = nullptr;
-        io.BackendFlags &= ~ImGuiBackendFlags_RendererHasViewports;
+        io.BackendFlags &= ~ImGuiBackendFlags_RendererHasVtxOffset;
 
         IM_DELETE(bd);
     }
@@ -271,9 +271,9 @@ namespace engine::ui {
                                 {0.f,       0.f,       0.f},
                                 {
                                  (uint8_t) (vtx.col & 0xFF),
-                                            (uint8_t) ((vtx.col >> 8) & 0xFF),
-                                                       (uint8_t) ((vtx.col >> 16) & 0xFF),
-                                        (uint8_t) ((vtx.col >> 24) & 0xFF),
+                                 (uint8_t) ((vtx.col >> 8) & 0xFF),
+                                 (uint8_t) ((vtx.col >> 16) & 0xFF),
+                                 (uint8_t) ((vtx.col >> 24) & 0xFF),
                                 }
                         });
                     }
@@ -282,7 +282,7 @@ namespace engine::ui {
                             engine::core::runtime::graphics::PrimitiveType::PRIMITIVE_TYPE_TRIANGLES,
                             std::move(vtxCollection),
                             (core::runtime::graphics::ITexture *) cmdPtr->GetTexID(),
-                            {clip_min.x, clip_max.y},
+                            {clip_min.x, clip_min.y},
                             {clip_max.x - clip_min.x, clip_max.y - clip_min.y}
                     });
                 }

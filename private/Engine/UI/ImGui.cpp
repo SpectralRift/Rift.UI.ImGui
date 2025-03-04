@@ -29,7 +29,12 @@ namespace engine::ui {
 
         ImGuiIO &io = ImGui::GetIO();
 
-        io.Fonts->AddFontFromFileTTF("DataRaw/Engine/Fonts/Lexend.ttf", 16.0f);
+        ImFontConfig fontConfig;
+        fontConfig.OversampleH = 2;
+        fontConfig.OversampleV = 2;
+
+        io.Fonts->AddFontFromFileTTF("DataRaw/Engine/Fonts/Lexend.ttf", 16.0f, &fontConfig);
+        io.Fonts->AddFontFromFileTTF("DataRaw/Engine/Fonts/SourceCodePro.ttf", 14.0f, &fontConfig);
 
         ImGui_ImplEngine_Init(gContext, renderer);
     }
