@@ -1,14 +1,17 @@
 #include <memory>
 #include <vector>
+#include <cstdlib>
 
-#include <Engine/UI/ImGui.hpp>
+#include <Engine/UI/ImGui_Engine_Mappings.hpp>
 #include <Engine/UI/ImGui_Impl_Engine.hpp>
 
 #include <Engine/Core/Runtime/Graphics/ITexture.hpp>
 #include <Engine/Core/Runtime/Graphics/Vertex.hpp>
 #include <Engine/Core/Runtime/IWindow.hpp>
-#include <Engine/Core/Runtime/Input/InputManager.hpp>
-#include <Engine/Core/Runtime/Input/InputEvent.hpp>
+#include <Engine/Core/Hashing/FNV.hpp>
+
+
+#include <Engine/Input/InputManager.hpp>
 
 namespace engine::ui {
     struct ImGui_ImplEngine_Data {
@@ -21,63 +24,85 @@ namespace engine::ui {
         return ImGui::GetCurrentContext() ? (ImGui_ImplEngine_Data *) ImGui::GetIO().BackendRendererUserData : nullptr;
     }
 
-    ImGuiMouseButton ImGui_ImplEngine_MapInputDeviceButton(core::runtime::input::InputDeviceButton button) {
-        switch (button) {
-            default:
-            case core::runtime::input::INPUT_DEVICE_BUTTON_MOUSE_LEFT:
-                return ImGuiMouseButton_Left;
-            case core::runtime::input::INPUT_DEVICE_BUTTON_MOUSE_RIGHT:
-                return ImGuiMouseButton_Right;
-            case core::runtime::input::INPUT_DEVICE_BUTTON_MOUSE_MIDDLE:
-                return ImGuiMouseButton_Middle;
+    void ImGui_ImplEngine_OnKeyStateChanged(input::InputKeyHandle key, bool state) {
+        auto x = ImGui_ImplEngine_MapKey(key);
+
+        if (x != ImGuiKey_None) {
+            ImGui::GetIO().AddKeyEvent(x, state);
         }
     }
 
-    void ImGui_ImplEngine_OnInputEvent(core::runtime::input::InputEvent *event) {
+    void ImGui_ImplEngine_OnMouseStateChanged(input::InputKeyHandle key, bool state) {
+        auto x = ImGui_ImplEngine_MapInputDeviceButton(key);
+
+        if (x != ImGuiMouseButton_COUNT) {
+            ImGui::GetIO().AddMouseButtonEvent(x, state);
+        }
+    }
+
+    void ImGui_ImplEngine_OnMousePosition(core::math::Vector2 position) {
         ImGuiIO &io = ImGui::GetIO();
 
-        auto eventType = event->GetEventType();
+        io.AddMouseSourceEvent(ImGuiMouseSource_Mouse);
+        io.AddMousePosEvent(position.x, position.y);
+    }
 
-        if (eventType == core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_MOVE) {
-            auto mvEv = dynamic_cast<engine::core::runtime::input::MouseMoveEvent *>(event);
-            io.AddMousePosEvent(mvEv->Position.x, mvEv->Position.y);
-        } else if (eventType == core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_KEY_DOWN) {
-            auto mdEv = dynamic_cast<engine::core::runtime::input::MouseButtonDownEvent *>(event);
-            io.AddMouseButtonEvent(ImGui_ImplEngine_MapInputDeviceButton(mdEv->Button), true);
-        } else if (eventType == core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_KEY_UP) {
-            auto mdEv = dynamic_cast<engine::core::runtime::input::MouseButtonUpEvent *>(event);
-            io.AddMouseButtonEvent(ImGui_ImplEngine_MapInputDeviceButton(mdEv->Button), false);
-        } else if (eventType == core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_START) {
-            auto tsEv = dynamic_cast<engine::core::runtime::input::TouchStartEvent *>(event);
+    void ImGui_ImplEngine_OnTouchMove(int fingerId, core::math::Vector2 position) {
+        ImGuiIO &io = ImGui::GetIO();
 
-            // make sure we're tracking only the first finger
-            if (tsEv->FingerId == 0) {
-                io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-                io.AddMousePosEvent(tsEv->Position.x, tsEv->Position.y);
-                io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
-            }
-        } else if (eventType == core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_DRAG) {
-            auto tdEv = dynamic_cast<engine::core::runtime::input::TouchDragEvent *>(event);
-
-            // make sure we're tracking only the first finger
-            if (tdEv->FingerId == 0) {
-                io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-                io.AddMousePosEvent(tdEv->Position.x, tdEv->Position.y);
-            }
-        } else if (eventType == core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_END) {
-            auto teEv = dynamic_cast<engine::core::runtime::input::TouchEndEvent *>(event);
-
-            // make sure we're tracking only the first finger
-            if (teEv->FingerId == 0) {
-                io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-                io.AddMousePosEvent(teEv->Position.x, teEv->Position.y);
-                io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
-            }
-        } else if (eventType == core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_HOVER) {
-            auto thEv = dynamic_cast<engine::core::runtime::input::TouchHoverEvent *>(event);
-
+        // make sure we're tracking only the first finger
+        if (fingerId == 0) {
             io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-            io.AddMousePosEvent(thEv->Position.x, thEv->Position.y);
+            io.AddMousePosEvent(position.x, position.y);
+        }
+    }
+
+    void ImGui_ImplEngine_OnTouchDown(int fingerId, core::math::Vector2 position) {
+        ImGui_ImplEngine_OnTouchMove(fingerId, position);
+
+        // make sure we're tracking only the first finger
+        if (fingerId == 0) {
+            ImGui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+        }
+    }
+
+    void ImGui_ImplEngine_OnTouchUp(int fingerId, core::math::Vector2 position) {
+        ImGui_ImplEngine_OnTouchMove(fingerId, position);
+
+        // make sure we're tracking only the first finger
+        if (fingerId == 0) {
+            ImGui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+        }
+    }
+
+    void ImGui_ImplEngine_OnInputEvent(const input::InputEvent &event) {
+        ImGuiIO &io = ImGui::GetIO();
+
+        switch (event.Type) {
+            case input::INPUT_EVENT_TYPE_INPUT_CHAR:
+                io.AddInputCharacterUTF16(event.UInputChar);
+                break;
+            case input::INPUT_EVENT_TYPE_KEY_STATE_CHANGE:
+                ImGui_ImplEngine_OnKeyStateChanged(event.Key, event.KeyState);
+                ImGui_ImplEngine_OnMouseStateChanged(event.Key, event.KeyState);
+                break;
+            case input::INPUT_EVENT_TYPE_MOUSE_POSITION:
+                ImGui_ImplEngine_OnMousePosition(event.Position);
+                break;
+            case input::INPUT_EVENT_TYPE_TOUCH_MOVE:
+                ImGui_ImplEngine_OnTouchMove(event.TouchFinger, event.Position);
+                break;
+            case input::INPUT_EVENT_TYPE_TOUCH_DOWN:
+                ImGui_ImplEngine_OnTouchDown(event.TouchFinger, event.Position);
+                break;
+            case input::INPUT_EVENT_TYPE_TOUCH_UP:
+                ImGui_ImplEngine_OnTouchUp(event.TouchFinger, event.Position);
+                break;
+            case input::INPUT_EVENT_TYPE_TOUCH_HOVER:
+                ImGui_ImplEngine_OnTouchMove(0, event.Position);
+                break;
+            default:
+                break;
         }
     }
 
@@ -92,49 +117,12 @@ namespace engine::ui {
         io.BackendPlatformName = "imgui_impl_engine_rift";
         io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
-        ImFontConfig font_cfg;
-        font_cfg.SizePixels = 20.0f;
-
-//        io.Fonts->AddFontDefault(&font_cfg);
-//        ImGui::GetStyle().ScaleAllSizes(1.3f);
-
-        ImGui::GetStyle().FrameRounding = 3.0f;
-        auto colors = ImGui::GetStyle().Colors;
-        colors[ImGuiCol_WindowBg]               = ImVec4(0.13f, 0.13f, 0.13f, 1.00f);
-        colors[ImGuiCol_FrameBg] = ImVec4(0.251f, 0.251f, 0.251f, 1.0f);
-        colors[ImGuiCol_TitleBg] = ImVec4(0.359f, 0.359f, 0.359f, 1.0f);
-        colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.359f, 0.359f, 0.359f, 1.0f);
-        colors[ImGuiCol_TitleBgActive] = ImVec4(0.251f, 0.251f, 0.251f, 1.0f);
-        colors[ImGuiCol_Button] = ImVec4(0.54f, 0.54f, 0.54f, 1.00f);
-        colors[ImGuiCol_ButtonHovered] = ImVec4(0.41f, 0.67f, 1.00f, 1.00f);
-        colors[ImGuiCol_ButtonActive] = ImVec4(0.11f, 0.50f, 1.00f, 1.00f);
-
         ImGui_ImplEngine_Data *bd = ImGui_ImplEngine_GetBackendData();
         bd->m_GfxContext = gContext;
         bd->m_Renderer = renderer;
 
-        auto inputManager = engine::core::runtime::input::InputManager::Instance();
-
-        inputManager->RegisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_MOVE,
-                                           ImGui_ImplEngine_OnInputEvent);
-        inputManager->RegisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_KEY_DOWN,
-                                           ImGui_ImplEngine_OnInputEvent);
-        inputManager->RegisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_KEY_UP,
-                                           ImGui_ImplEngine_OnInputEvent);
-        inputManager->RegisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_START,
-                                           ImGui_ImplEngine_OnInputEvent);
-        inputManager->RegisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_DRAG,
-                                           ImGui_ImplEngine_OnInputEvent);
-        inputManager->RegisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_END,
-                                           ImGui_ImplEngine_OnInputEvent);
-        inputManager->RegisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_HOVER,
-                                           ImGui_ImplEngine_OnInputEvent);
-//        auto mousePos = inputManager->GetAxis(core::runtime::input::INPUT_DEVICE_AXIS_MOUSE);
-//
-//        io.AddMousePosEvent(mousePos.x, mousePos.y);
-//        io.AddMouseButtonEvent(ImGuiMouseButton_Left, inputManager->GetButton(core::runtime::input::INPUT_DEVICE_BUTTON_MOUSE_LEFT));
-//        io.AddMouseButtonEvent(ImGuiMouseButton_Right, inputManager->GetButton(core::runtime::input::INPUT_DEVICE_BUTTON_MOUSE_RIGHT));
-//        io.AddMouseButtonEvent(ImGuiMouseButton_Middle, inputManager->GetButton(core::runtime::input::INPUT_DEVICE_BUTTON_MOUSE_MIDDLE));
+        auto inputManager = input::InputManager::Instance();
+        inputManager->AddInputListener(ImGui_ImplEngine_OnInputEvent);
 
         return true;
     }
@@ -144,7 +132,7 @@ namespace engine::ui {
         ImGui_ImplEngine_Data *bd = ImGui_ImplEngine_GetBackendData();
 
         if (bd->m_FontTexture) {
-//            bd->m_FontTexture->Destroy();
+            bd->m_FontTexture->Destroy();
             io.Fonts->SetTexID(nullptr);
             bd->m_FontTexture = nullptr;
         }
@@ -155,23 +143,11 @@ namespace engine::ui {
         IM_ASSERT(bd != nullptr && "No renderer backend to shutdown, or already shutdown?");
         ImGuiIO &io = ImGui::GetIO();
 
-        auto inputManager = engine::core::runtime::input::InputManager::Instance();
-        inputManager->UnregisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_MOVE,
-                                             ImGui_ImplEngine_OnInputEvent);
-        inputManager->UnregisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_KEY_DOWN,
-                                             ImGui_ImplEngine_OnInputEvent);
-        inputManager->UnregisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_MOUSE_KEY_UP,
-                                             ImGui_ImplEngine_OnInputEvent);
-        inputManager->UnregisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_START,
-                                             ImGui_ImplEngine_OnInputEvent);
-        inputManager->UnregisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_DRAG,
-                                             ImGui_ImplEngine_OnInputEvent);
-        inputManager->UnregisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_END,
-                                             ImGui_ImplEngine_OnInputEvent);
-        inputManager->UnregisterEventHandler(core::runtime::input::InputEventType::INPUT_EVENT_TYPE_TOUCH_HOVER,
-                                             ImGui_ImplEngine_OnInputEvent);
+        auto inputManager = input::InputManager::Instance();
+        inputManager->RemoveInputListener(ImGui_ImplEngine_OnInputEvent);
 
-//        ImGui_ImplOpenGL2_DestroyDeviceObjects();
+        ImGui_ImplEngine_DestroyFontsTexture();
+
         io.BackendRendererName = nullptr;
         io.BackendRendererUserData = nullptr;
         io.BackendFlags &= ~ImGuiBackendFlags_RendererHasVtxOffset;
@@ -186,18 +162,18 @@ namespace engine::ui {
         ImGuiIO &io = ImGui::GetIO();
 
         // create font atlas texture from ImGUI
-        unsigned char *pixels;
+        core::runtime::graphics::Color *pixels;
         int width, height;
 
-        io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+        io.Fonts->GetTexDataAsRGBA32(reinterpret_cast<unsigned char **>(&pixels), &width, &height);
 
         // create font texture and upload it to GPU
         bd->m_FontTexture = bd->m_GfxContext->GetBackend()->CreateTexture();
+        IM_ASSERT(bd->m_FontTexture != nullptr && "Failed to create font atlas texture!");
         bd->m_FontTexture->Create({
                                           {
-                                                  reinterpret_cast<core::runtime::graphics::Color *>(pixels),
-                                                  reinterpret_cast<core::runtime::graphics::Color *>(pixels) +
-                                                  width * height
+                                                  pixels,
+                                                  pixels + width * height
                                           },
                                           {
                                                   (float) width,
@@ -218,8 +194,9 @@ namespace engine::ui {
         auto winSize = bd->m_GfxContext->GetOwnerWindow()->GetSize();
         io.DisplaySize = {winSize.x, winSize.y};
 
-        if (!bd->m_FontTexture)
+        if (!bd->m_FontTexture) {
             ImGui_ImplEngine_CreateFontsTexture();
+        }
     }
 
     void ImGui_ImplEngine_RenderDrawData(ImDrawData *drawData) {
@@ -229,8 +206,7 @@ namespace engine::ui {
         auto fb_width = (int) (drawData->DisplaySize.x * drawData->FramebufferScale.x);
         auto fb_height = (int) (drawData->DisplaySize.y * drawData->FramebufferScale.y);
 
-        if (fb_width == 0 || fb_height == 0)
-            return;
+        if (fb_width == 0 || fb_height == 0) { return; }
 
         auto io = ImGui::GetIO();
 
@@ -253,8 +229,8 @@ namespace engine::ui {
                                     (cmdPtr->ClipRect.y - clip_off.y) * clip_scale.y);
                     ImVec2 clip_max((cmdPtr->ClipRect.z - clip_off.x) * clip_scale.x,
                                     (cmdPtr->ClipRect.w - clip_off.y) * clip_scale.y);
-                    if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
-                        continue;
+
+                    if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y) { continue; }
 
                     std::vector<core::runtime::graphics::Vertex> vtxCollection(cmdPtr->ElemCount);
 
@@ -271,9 +247,9 @@ namespace engine::ui {
                                 {0.f,       0.f,       0.f},
                                 {
                                  (uint8_t) (vtx.col & 0xFF),
-                                 (uint8_t) ((vtx.col >> 8) & 0xFF),
-                                 (uint8_t) ((vtx.col >> 16) & 0xFF),
-                                 (uint8_t) ((vtx.col >> 24) & 0xFF),
+                                            (uint8_t) ((vtx.col >> 8) & 0xFF),
+                                                       (uint8_t) ((vtx.col >> 16) & 0xFF),
+                                        (uint8_t) ((vtx.col >> 24) & 0xFF),
                                 }
                         });
                     }

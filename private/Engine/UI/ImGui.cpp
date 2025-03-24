@@ -36,6 +36,17 @@ namespace engine::ui {
         io.Fonts->AddFontFromFileTTF("DataRaw/Engine/Fonts/Lexend.ttf", 16.0f, &fontConfig);
         io.Fonts->AddFontFromFileTTF("DataRaw/Engine/Fonts/SourceCodePro.ttf", 14.0f, &fontConfig);
 
+        ImGui::GetStyle().FrameRounding = 3.0f;
+        auto colors = ImGui::GetStyle().Colors;
+        colors[ImGuiCol_WindowBg] = ImVec4(0.13f, 0.13f, 0.13f, 1.00f);
+        colors[ImGuiCol_FrameBg] = ImVec4(0.251f, 0.251f, 0.251f, 1.0f);
+        colors[ImGuiCol_TitleBg] = ImVec4(0.359f, 0.359f, 0.359f, 1.0f);
+        colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.359f, 0.359f, 0.359f, 1.0f);
+        colors[ImGuiCol_TitleBgActive] = ImVec4(0.251f, 0.251f, 0.251f, 1.0f);
+        colors[ImGuiCol_Button] = ImVec4(0.54f, 0.54f, 0.54f, 1.00f);
+        colors[ImGuiCol_ButtonHovered] = ImVec4(0.41f, 0.67f, 1.00f, 1.00f);
+        colors[ImGuiCol_ButtonActive] = ImVec4(0.11f, 0.50f, 1.00f, 1.00f);
+
         ImGui_ImplEngine_Init(gContext, renderer);
     }
 

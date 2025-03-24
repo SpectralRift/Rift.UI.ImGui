@@ -5,6 +5,7 @@ add_library(
         Rift_UI_ImGui
         STATIC
         private/Engine/UI/ImGui.cpp
+        private/Engine/UI/ImGui_Engine_Mappings.cpp
         private/Engine/UI/ImGui_Impl_Engine.cpp
         third_party/imgui/imgui.cpp
         third_party/imgui/imgui_draw.cpp
@@ -24,6 +25,6 @@ target_compile_definitions(
         PRIVATE "-DIMGUI_USER_CONFIG=<Engine/UI/ImGui_Rift_Config.hpp>"
 )
 
-target_link_libraries(Rift_UI_ImGui RiftEngine_Core_Runtime)
+target_link_libraries(Rift_UI_ImGui RiftEngine_Core_Runtime Rift_Input)
 
 rift_bundle_folder(${CMAKE_CURRENT_SOURCE_DIR}/assets)
