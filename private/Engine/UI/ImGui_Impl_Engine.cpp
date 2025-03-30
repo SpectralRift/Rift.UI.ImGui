@@ -1,6 +1,5 @@
 #include <memory>
 #include <vector>
-#include <cstdlib>
 
 #include <Engine/UI/ImGui_Engine_Mappings.hpp>
 #include <Engine/UI/ImGui_Impl_Engine.hpp>
@@ -8,16 +7,20 @@
 #include <Engine/Core/Runtime/Graphics/ITexture.hpp>
 #include <Engine/Core/Runtime/Graphics/Vertex.hpp>
 #include <Engine/Core/Runtime/IWindow.hpp>
-#include <Engine/Core/Hashing/FNV.hpp>
 
-
+#include <Engine/Input/ImGui_InputTarget.hpp>
 #include <Engine/Input/InputManager.hpp>
+
+#include <Engine/Core/Platform.hpp>
+
+#include <imgui_internal.h>
 
 namespace engine::ui {
     struct ImGui_ImplEngine_Data {
         std::unique_ptr<core::runtime::graphics::ITexture> m_FontTexture;
         core::runtime::graphics::IGraphicsContext *m_GfxContext;
         core::runtime::graphics::IRenderer *m_Renderer;
+        std::unique_ptr<input::ImGuiInputTarget> m_UIInputTarget;
     };
 
     static ImGui_ImplEngine_Data *ImGui_ImplEngine_GetBackendData() {
@@ -75,7 +78,7 @@ namespace engine::ui {
         }
     }
 
-    void ImGui_ImplEngine_OnInputEvent(const input::InputEvent &event) {
+    bool ImGui_ImplEngine_OnInputEvent(const input::InputEvent &event) {
         ImGuiIO &io = ImGui::GetIO();
 
         switch (event.Type) {
@@ -104,6 +107,8 @@ namespace engine::ui {
             default:
                 break;
         }
+
+        return io.WantCaptureMouse || io.WantCaptureKeyboard;
     }
 
     bool ImGui_ImplEngine_Init(core::runtime::graphics::IGraphicsContext *gContext,
@@ -117,12 +122,37 @@ namespace engine::ui {
         io.BackendPlatformName = "imgui_impl_engine_rift";
         io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
+        io.PlatformSetImeDataFn = [](ImGuiContext* context, ImGuiViewport *viewport, ImGuiPlatformImeData *data) {
+            if (!core::Platform::GetVirtualKeyboard()) {
+                return;
+            }
+
+            auto bd = (ImGui_ImplEngine_Data *) context->IO.BackendRendererUserData;
+
+            if(data->WantVisible) {
+                auto textState = ImGui::GetInputTextState(ImGui::GetActiveID());
+
+                if(!bd->m_UIInputTarget) {
+                    bd->m_UIInputTarget = std::make_unique<input::ImGuiInputTarget>(
+                            textState,
+                            context->IO
+                    );
+                } else {
+                    bd->m_UIInputTarget->SetTextState(textState);
+                }
+
+                core::Platform::GetVirtualKeyboard()->Show(true, bd->m_UIInputTarget.get());
+            } else {
+                bd->m_UIInputTarget.reset();
+                core::Platform::GetVirtualKeyboard()->Show(false, nullptr);
+            }
+        };
+
         ImGui_ImplEngine_Data *bd = ImGui_ImplEngine_GetBackendData();
         bd->m_GfxContext = gContext;
         bd->m_Renderer = renderer;
 
-        auto inputManager = input::InputManager::Instance();
-        inputManager->AddInputListener(ImGui_ImplEngine_OnInputEvent);
+        input::InputManager::Instance()->AddInputListener(ImGui_ImplEngine_OnInputEvent, true);
 
         return true;
     }

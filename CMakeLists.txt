@@ -7,6 +7,7 @@ add_library(
         private/Engine/UI/ImGui.cpp
         private/Engine/UI/ImGui_Engine_Mappings.cpp
         private/Engine/UI/ImGui_Impl_Engine.cpp
+        private/Engine/Input/ImGui_InputTarget.cpp
         third_party/imgui/imgui.cpp
         third_party/imgui/imgui_draw.cpp
         third_party/imgui/imgui_demo.cpp
