@@ -1,0 +1,19 @@
+{
+  "module": {
+    "name": "Rift.UI.ImGui",
+    "category": "User Interface",
+    "version": "1.12.7",
+    "author": "r0neko",
+    "description": "ImGui UI support for the SpectralRift Engine",
+    "homepage": "https://github.com/SpectralRift/Rift.UI.ImGui",
+    "type": "monolithic",
+    "cmakeProject": "Rift_UI_ImGui"
+  },
+  "dependencies": [
+    "Rift.Core.Runtime",
+    "Rift.Input"
+  ],
+  "supportedTargets": [
+    "all"
+  ]
+}

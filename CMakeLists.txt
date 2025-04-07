@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(Rift_UI_ImGui VERSION 0.0.1)
+project(Rift_UI_ImGui VERSION 1.12.7)
 
 add_library(
         Rift_UI_ImGui
@@ -26,6 +26,8 @@ target_compile_definitions(
         PRIVATE "-DIMGUI_USER_CONFIG=<Engine/UI/ImGui_Rift_Config.hpp>"
 )
 
-target_link_libraries(Rift_UI_ImGui RiftEngine_Core_Runtime Rift_Input)
+rift_resolve_module_libs("Rift.Core.Runtime;Rift.Input" RIFT_IMGUI_DEPS)
+
+target_link_libraries(Rift_UI_ImGui ${RIFT_IMGUI_DEPS})
 
 rift_bundle_folder(${CMAKE_CURRENT_SOURCE_DIR}/assets)
